@@ -470,24 +470,29 @@ def foodHeuristic(state, problem):
     Subsequent calls to this heuristic can access
     problem.heuristicInfo['wallCount']
     """
+    """
     position, foodGrid = state
     "*** YOUR CODE HERE ***"
-    def mazeDist(a, b):
-        pair = (tuple(a), tuple(b))
-        if pair in problem.heuristicInfo:
-            return problem.heuristicInfo[pair]
-        d = mazeDistance(tuple(a), tuple(b), problem.startingGameState)
-        problem.heuristicInfo[pair] = d
-        return d
     foodList = foodGrid.asList()
     if len(foodList) == 0:
         return 0
-    mokul = pdist(np.array(foodList), mazeDist)
+    mokul = pdist(np.array(foodList), manhattanDist)
     dist = squareform(mokul)
     furthest = np.unravel_index(dist.argmax(), dist.shape)
-    return dist.max() + min(mazeDist(foodList[furthest[0]], position),
-                            mazeDist(foodList[furthest[1]], position))
-                            
+    return dist.max() + min(manhattanDistance(foodList[furthest[0]], position),
+                            manhattanDistance(foodList[furthest[1]], position))
+    """
+    from itertools import combinations
+    position, foodGrid = state
+    foods = foodGrid.asList()
+    dist = lambda p, q: abs(p[0]-q[0])+abs(p[1]-q[1])
+    d = 0
+    pair_dists = [dist(x[0], x[1]) for x in combinations([position] + foods, 2)]
+    if len(pair_dists) > 0:
+        d = max(pair_dists)
+    return d
+        
+
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
     def registerInitialState(self, state):
