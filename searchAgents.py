@@ -290,15 +290,15 @@ class CornersProblem(search.SearchProblem):
         # Please add any code here which you would like to use
         # in initializing the problem
         "*** YOUR CODE HERE ***"
-        self.costFn = lambda x: 1 # is it ok?
+        self.cost_func = lambda x: 1 
 
     def getStartState(self):
         """
         Returns the start state (in your state space, not the full Pacman state
         space)
         """
-        x, y = self.startingPosition
-        return (x, y, (0, 0, 0, 0))
+        a, b = self.startingPosition
+        return (a, b, (0, 0, 0, 0))
 
     def isGoalState(self, state):
         """
@@ -319,21 +319,21 @@ class CornersProblem(search.SearchProblem):
         for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
             # Add a successor state to the successor list if the action is legal
             # Here's a code snippet for figuring out whether a new position hits a wall:
-            (x, y, been) = state
+            (x, y, seen) = state
             dx, dy = Actions.directionToVector(action)
             nextx, nexty = int(x + dx), int(y + dy)
             hitsWall = self.walls[nextx][nexty]
-            "*** YOUR CODE HERE ***"
+
             if not hitsWall:
-                nextState = (nextx, nexty)
-                cost = self.costFn(nextState)
-                if nextState in self.corners:
-                    index = self.corners.index(nextState)
-                    new_been = list(been)
-                    new_been[index] = 1
-                    successors.append(((nextx, nexty, tuple(new_been)), action, cost))
+                next_s = (nextx, nexty)
+                cost = self.cost_func(next_s)
+                if next_s in self.corners:
+                    index = self.corners.index(next_s)
+                    new_seen = list(seen)
+                    new_seen[index] = 1
+                    successors.append(((nextx, nexty, tuple(new_seen)), action, cost))
                 else:
-                    successors.append(((nextx, nexty, been), action, cost))
+                    successors.append(((nextx, nexty, seen), action, cost))
 
         self._expanded += 1 # DO NOT CHANGE
         return successors
@@ -351,6 +351,75 @@ class CornersProblem(search.SearchProblem):
             if self.walls[x][y]: return 999999
         return len(actions)
 
+class UnionFind:
+    """
+    union_find set data-structure to be used in min_spanning's algorithm
+    """
+
+    def __init__(self, members):
+        self.rep_to_members = {}
+        self.member_to_rep = {}
+
+        for member in members:
+            self.add_set(member)
+
+    def add_set(self, member):
+        self.rep_to_members[member] = {member}
+        self.member_to_rep[member] = member
+
+    def find_rep(self, member):
+        return self.member_to_rep[member]
+
+    def merge_sets(self, member1, member2):
+        mem1_rep = self.find_rep(member1)
+        mem2_rep = self.find_rep(member2)
+
+        # Move all members related to member2 to member1's set
+        for mem in self.rep_to_members.pop(mem2_rep):
+            self.member_to_rep[mem] = mem1_rep
+            self.rep_to_members[mem1_rep].add(mem)
+
+
+def min_spanning_edges(foods, d):
+
+    
+    union_find_set = UnionFind(foods)
+    ordered_edges = sorted(
+        (
+            (foods[i], foods[j])
+            for i in range(len(foods))
+            for j in range(i + 1, len(foods))
+        ),
+        key=lambda twos: d(*twos)
+    )
+
+    edges = set()
+    for a, b in ordered_edges:
+        if union_find_set.find_rep(a) != union_find_set.find_rep(b):
+            edges.add((a, b))
+            union_find_set.merge_sets(a, b)
+
+    return edges
+
+
+def min_spanning_heuristic(pos, foods, d):
+    """
+    Heuristic: total length of the minimum-spanning tree of graph G, where
+        Nodes = pacman_pos + (food coordinates)
+        Edges = distance between coordinate pairs
+    This is a lower bound because the total length of an MST is a lower bound
+    on a TSP tour (which PacMan must complete to eat all the food).
+    This heuristic is no greater than a TSP tour because a
+    TSP tour must be at least as long as the total length of an MST.
+    If it was shorter, the MST would be the TSP tour.
+    Thus, this heuristic is admissible and consistent.
+    """
+    weight = 0
+    edges = min_spanning_edges([pos] + list(foods), d)
+    for one, two in edges:
+        weight += d(one,two)
+    
+    return weight
 
 def cornersHeuristic(state, problem):
     """
@@ -364,17 +433,15 @@ def cornersHeuristic(state, problem):
     """
     corners = problem.corners # These are the corner coordinates
     walls = problem.walls # These are the walls of the maze, as a Grid (game.py)
-    "*** YOUR CODE HERE ***"
-
-    max_distance = 0
-    stateX, stateY, been = state
-    for i in range(4):
-        if been[i] == 0:
-            cornerX, cornerY = corners[i]
-            d = manhattanDistance((stateX, stateY), corners[i])
-            if d > max_distance:
-                max_distance = d
-    return max_distance
+    maxDist = 0
+    (sX, sY, seen) = state
+    num_iter = 4
+    for i in range(num_iter):
+        if seen[i] == 0:
+            d = manhattanDistance((sX, sY), corners[i])
+            if d > maxDist:
+                maxDist = d
+    return maxDist
 
 
 ############# Help functions ###################
@@ -453,43 +520,15 @@ class AStarFoodSearchAgent(SearchAgent):
     def __init__(self):
         self.searchFunction = lambda prob: search.aStarSearch(prob, foodHeuristic)
         self.searchType = FoodSearchProblem
-
+     
 def foodHeuristic(state, problem):
     
-    #Please note the time complexity for computing this heuristic is O(n^3) [polynomial time]
-    #where n = number of foods in the state
-
-    #Additionaly, to prove that the heuristic is admissible, here is the explanation
-    #First, for every starting food dot (n possibilities), we build a (manhattan) tour 
-    #by selecting the nearest food dot to the node, and then move to the nearest one and repeat
-    #the greedy process, till we finish all the food dots (aka build a full path).
-    #Next, we do this n times by starting the tour at all n possible starting points.
-    #Then, we use the cost of the smallest tour plus the distance from pacman position 
-    #to the tour's starting node.
-
-    #PS - This approach is different from plain greedy because it considers a tour from every
-    #possible starting points, making sure the final answer selected is a manhattan
-    #estimate of the smallest/cheapest tour. Consider the example for a second
-
-    #........................P    .....
-    #In the situation above, if we just be greedy we would choose the dot to the left
-    #of pacman and end up going the longer route (towards the left end). But in my approach,
-    # we look at the possible tours from every single food dot. So
-    #even though the initial dist to right food now is higher. Tour(from right) +
-    # dist to (right) < Tour(from left) + dist to (left), even though dist to left <
-    #dist to right. Plus, having tested for every single test case, we can say the manhattan
-    #estimate of the path is an admissible heuristic
-
-    #Moreover since we are in a grid world and are using manhattan distance combined with 
-    #the fact that no pacman state has two consecutive rows with foods without a wall separting them
-    #this heuristic should prove admissible for all the "pacman" states.
-
-    
+    #We use the length of the minimum spanning tree as the heuristic.
+    """
     position, foodGrid = state
     foodList = foodGrid.asList()
     if len(foodList) == 0:
         return 0
-    
     
     distances = []
     for t in range(len(foodList)):
@@ -499,12 +538,12 @@ def foodHeuristic(state, problem):
         while len(included) < len(foodList):
             if len(included) == len(foodList):
                 break
-            min_food_dist = 2**30
+            min_food_dist = 2**50
             node_this_iter = None
             for i in range(len(foodList)):
                 if(foodList[i] in included):
                     continue
-                if(manhattanDistance(foodList[i], curr) < min_food_dist):
+                if(euclideanDistance(foodList[i], curr) < min_food_dist):
                     min_food_dist = manhattanDistance(foodList[i], curr)
                     node_this_iter = foodList[i]
             curr = node_this_iter
@@ -516,98 +555,14 @@ def foodHeuristic(state, problem):
         distances[i] = distances[i] + manhattanDistance(foodList[i], position)
     return min(distances)
     """
-    #Lower Bound on TSP
-    def mst_weight(foods, target):
-        if len(foods) == 0:
-            return 0
-        if len(foods) == 1:
-            return manhattanDistance(foods[0], target)
-        included = [foods[0]]
-        unincluded = foods[1:]
-        dists = []
-        while(len(unincluded) > 0):
-            one = None
-            two = None
-            min_dist = 2**30
-            for i in range(len(foods)):
-                for j in range(len(foods)):
-                    a = (i == j)
-                    b = (foods[i] in included) and (foods[j] in included)
-                    if(not a and not b):
-                        if(manhattanDistance(foods[i], foods[j]) < min_dist):
-                            one = foods[i]
-                            two = foods[j]
-                            min_dist = manhattanDistance(foods[i], foods[j])
-            if one not in included:
-                included.append(one)
-            if two not in included:
-                included.append(two)
-            if one in unincluded:
-                unincluded.remove(one)
-            if two in unincluded:
-                unincluded.remove(two)
+    position, foodGrid = state
 
-            dists.append(min_dist)
-        min_one = foods[0]
-        for i in range(len(foods)):
-            if manhattanDistance(foods[i], target) < manhattanDistance(min_one, target):
-                min_one = foods[i]
-        min_two = foods[1]
-        for i in range(len(foods)):
-            x = (foods[i] != min_one)
-            if manhattanDistance(foods[i], target) < manhattanDistance(min_two, target) and x:
-                min_two = foods[i]
-        return sum(dists) + manhattanDistance(min_one, target) + manhattanDistance(min_two, target)
-    d = []
-    for i in range(len(foodList)):
-        d.append(mst_weight(foodList[:i] + foodList[i+1:], foodList[i]))
+    if problem.isGoalState(state) or (len(foodGrid.asList()) == 0):
+        return 0
+
+    mst_length = min_spanning_heuristic(position,foodGrid.asList(),lambda x, y: manhattanDistance(x, y))
+    return mst_length
     
-    s = max(d)
-    min_to_pos = foodList[0]
-    for i in range(len(foodList)):
-        if manhattanDistance(foodList[i], position) < manhattanDistance(min_to_pos, position):
-            min_to_pos = foodList[i]
-
-    low = s + manhattanDistance(min_to_pos, position)
-    return low
-    """
-    """
-    included = [foodList[0]]
-    unincluded = foodList[1:]
-
-    dists = []
-    while(len(unincluded) > 0):
-        one = None
-        two = None
-        min_dist = 2**30
-        for i in range(len(foodList)):
-            for j in range(len(foodList)):
-                a = (i == j)
-                b = (foodList[i] in included) and (foodList[j] in included)
-                if(not a and not b):
-                    if(manhattanDistance(foodList[i], foodList[j]) < min_dist):
-                        one = foodList[i]
-                        two = foodList[j]
-                        min_dist = manhattanDistance(foodList[i], foodList[j])
-        if one not in included:
-            included.append(one)
-        if two not in included:
-            included.append(two)
-        if one in unincluded:
-            unincluded.remove(one)
-        if two in unincluded:
-            unincluded.remove(two)
-
-        dists.append(min_dist)
-    min_to_pos = foodList[0]
-    for i in range(len(foodList)):
-        if manhattanDistance(foodList[i], position) < manhattanDistance(min_to_pos, position):
-            min_to_pos = foodList[i]
-    return sum(dists) + manhattanDistance(min_to_pos, position)
-    """
-
-
-
 
 
 class ClosestDotSearchAgent(SearchAgent):
