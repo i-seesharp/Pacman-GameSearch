@@ -72,9 +72,9 @@ def tinyMazeSearch(problem):
 
 
 def depthFirstSearch(problem):
-  
-    start = (problem.getStartState(), None, 0)
     open_container = util.Stack()
+    start = (problem.getStartState(), None, 0)
+    
     lst = [start]
     open_container.push(lst)
     while not open_container.isEmpty():
@@ -96,9 +96,9 @@ def depthFirstSearch(problem):
 
 def breadthFirstSearch(problem):
     """Search the shallowest nodes in the search tree first."""
-
-    start = (problem.getStartState(), None, 0)
     open_container = util.Queue()
+    start = (problem.getStartState(), None, 0)
+    
     open_container.push([start])
     visited = {start[0]: 0}
 
@@ -129,11 +129,13 @@ def breadthFirstSearch(problem):
 
 def uniformCostSearch(problem):
     """Search the node of least total cost first."""
-    start = problem.getStartState()
-    start_tuple = (start, None, 0)
     open_container = util.PriorityQueue()
-    open_container.push([start_tuple], start_tuple[2])
-    visited = {start_tuple[0]: start_tuple[2]}
+
+    start = problem.getStartState()
+    start_entry = (start, None, 0)
+   
+    open_container.push([start_entry], start_entry[2])
+    visited = {start_entry[0]: start_entry[2]}
 
     while not open_container.isEmpty():
         path = open_container.pop()
@@ -169,12 +171,13 @@ def nullHeuristic(state, problem=None):
 
 def aStarSearch(problem, heuristic=nullHeuristic):
     """Search the node that has the lowest combined cost and heuristic first."""
-    start = problem.getStartState()
-    start_tuple = (start, None, 0)
     open_container = util.PriorityQueue()
+    start = problem.getStartState()
+    start_entry = (start, None, 0)
+   
     #In OPEN, the priority we add is a tuple (cost + h, h), so whenever cos+h is same for elements, just h is checked.
-    open_container.push([start_tuple], (start_tuple[2]+ heuristic(start,problem),heuristic(start,problem)))
-    visited = {start_tuple[0]: start_tuple[2] + heuristic(start, problem)}
+    open_container.push([start_entry], (start_entry[2]+ heuristic(start,problem),heuristic(start,problem)))
+    visited = {start_entry[0]: start_entry[2] + heuristic(start,problem)}
 
     while not open_container.isEmpty():
         path = open_container.pop()
