@@ -290,7 +290,7 @@ class CornersProblem(search.SearchProblem):
         # Please add any code here which you would like to use
         # in initializing the problem
         "*** YOUR CODE HERE ***"
-        self.cost_func = lambda x: 1 
+        self.costFn = lambda x: 1 
 
     def getStartState(self):
         """
@@ -326,7 +326,7 @@ class CornersProblem(search.SearchProblem):
 
             if not hitsWall:
                 next_s = (nextx, nexty)
-                cost = self.cost_func(next_s)
+                cost = self.costFn(next_s)
                 if next_s in self.corners:
                     index = self.corners.index(next_s)
                     new_seen = list(seen)
@@ -352,37 +352,32 @@ class CornersProblem(search.SearchProblem):
         return len(actions)
 
 class UnionFind:
-    """
-    union_find set data-structure to be used in min_spanning's algorithm
-    """
+   
+    def __init__(self, vals):
+        self.rv = {}
+        self.vr = {}
 
-    def __init__(self, members):
-        self.rep_to_members = {}
-        self.member_to_rep = {}
+        for val in vals:
+            self.add_values(val)
 
-        for member in members:
-            self.add_set(member)
-
-    def add_set(self, member):
-        self.rep_to_members[member] = {member}
-        self.member_to_rep[member] = member
-
-    def find_rep(self, member):
-        return self.member_to_rep[member]
-
-    def merge_sets(self, member1, member2):
-        mem1_rep = self.find_rep(member1)
-        mem2_rep = self.find_rep(member2)
-
-        # Move all members related to member2 to member1's set
-        for mem in self.rep_to_members.pop(mem2_rep):
-            self.member_to_rep[mem] = mem1_rep
-            self.rep_to_members[mem1_rep].add(mem)
-
-
-def min_spanning_edges(foods, d):
-
+    def find_r(self, val):
+        return self.vr[val]
     
+    def add_values(self, val):
+        self.rv[val] = {val}
+        self.vr[val] = val
+
+    def merge_sets(self, val1, val2):
+        m_one_r = self.find_r(val1)
+        m_two_r = self.find_r(val2)
+
+        for val in self.rv.pop(m_two_r):
+            self.vr[val] = m_one_r
+            self.rv[m_one_r].add(val)
+
+
+def get_mst_edges(foods, d):
+
     union_find_set = UnionFind(foods)
     ordered_edges = sorted(
         (
@@ -395,31 +390,13 @@ def min_spanning_edges(foods, d):
 
     edges = set()
     for a, b in ordered_edges:
-        if union_find_set.find_rep(a) != union_find_set.find_rep(b):
+        if union_find_set.find_r(a) != union_find_set.find_r(b):
             edges.add((a, b))
             union_find_set.merge_sets(a, b)
 
     return edges
 
 
-def min_spanning_heuristic(pos, foods, d):
-    """
-    Heuristic: total length of the minimum-spanning tree of graph G, where
-        Nodes = pacman_pos + (food coordinates)
-        Edges = distance between coordinate pairs
-    This is a lower bound because the total length of an MST is a lower bound
-    on a TSP tour (which PacMan must complete to eat all the food).
-    This heuristic is no greater than a TSP tour because a
-    TSP tour must be at least as long as the total length of an MST.
-    If it was shorter, the MST would be the TSP tour.
-    Thus, this heuristic is admissible and consistent.
-    """
-    weight = 0
-    edges = min_spanning_edges([pos] + list(foods), d)
-    for one, two in edges:
-        weight += d(one,two)
-    
-    return weight
 
 def cornersHeuristic(state, problem):
     """
@@ -560,8 +537,12 @@ def foodHeuristic(state, problem):
     if problem.isGoalState(state) or (len(foodGrid.asList()) == 0):
         return 0
 
-    mst_length = min_spanning_heuristic(position,foodGrid.asList(),lambda x, y: manhattanDistance(x, y))
-    return mst_length
+    weight = 0
+    edges = get_mst_edges([position] + foodGrid.asList(), lambda x, y: manhattanDistance(x, y))
+    for one, two in edges:
+        weight += manhattanDistance(one,two)
+    
+    return weight
     
 
 
